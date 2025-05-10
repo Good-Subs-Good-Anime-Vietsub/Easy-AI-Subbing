@@ -44,20 +44,25 @@ jobs:
         pip install -r requirements.txt
 
     # Bước 4: Chạy PyInstaller với lệnh được chỉ định
-    # Lệnh này sẽ tạo ra thư mục output trong thư mục 'dist'
     - name: Run PyInstaller command
-      # Sử dụng command prompt shell trên Windows để đảm bảo các lệnh chạy đúng cú pháp
-      shell: cmd
+      # Sử dụng PowerShell để xử lý biến môi trường và lệnh PyInstaller
+      shell: pwsh
       run: |
-        # Lệnh PyInstaller theo yêu cầu của bạn:
-        # --name "Easy AI Subbing" -> Tên thư mục output trong dist/
-        # --icon app_icon.ico      -> File icon
-        # --windowed               -> Ứng dụng GUI, không console. NẾU LÀ CLI, HÃY BỎ --windowed
-        # --onedir                 -> Build thành thư mục
-        # --add-data "app_icon.ico;." -> Thêm file icon vào thư mục dữ liệu (có thể dư với --icon nhưng theo yêu cầu)
-        # main.py                  -> File script chính
-        # THAY THẾ 'app_icon.ico' và 'main.py' bằng đường dẫn TƯƠNG ĐỐI đến file của bạn nếu chúng không ở thư mục gốc
-        pyinstaller --clean --name "Easy AI Subbing" --icon app_icon.ico --windowed --onedir --add-data "app_icon.ico;." main.py
+        # Lệnh PyInstaller với tùy chọn đường dẫn làm việc và output rõ ràng
+        # ${{ github.workspace }} là đường dẫn đến thư mục gốc của repo trên runner (D:\a\Easy-AI-Subbing)
+        pyinstaller --clean `
+                    --workpath "${{ github.workspace }}/build" `
+                    --distpath "${{ github.workspace }}/dist" `
+                    --name "Easy AI Subbing" `
+                    --icon app_icon.ico `
+                    --windowed ` # Giữ lại nếu là GUI, bỏ đi nếu là CLI
+                    --onedir `
+                    --add-data "app_icon.ico;." ` # Đảm bảo đường dẫn tương đối này đúng từ gốc repo
+                    main.py                      # Đảm bảo đường dẫn tương đối này đúng từ gốc repo
+
+        # Sử dụng dấu ` (backtick) ở cuối dòng trong PowerShell để lệnh trải dài nhiều dòng cho dễ đọc
+        # hoặc viết tất cả trên một dòng:
+        # pyinstaller --clean --workpath "${{ github.workspace }}/build" --distpath "${{ github.workspace }}/dist" --name "Easy AI Subbing" --icon app_icon.ico --windowed --onedir --add-data "app_icon.ico;." main.py
 
     # Bước 5: Đổi tên thư mục output đã build để dễ nhận dạng (tùy chọn nhưng tốt)
     # PyInstaller đặt output trong thư mục 'dist'. Tên thư mục là "Easy AI Subbing".
