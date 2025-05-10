@@ -25,7 +25,7 @@ jobs:
       uses: actions/checkout@v4
       # Tùy chọn: Lấy lịch sử commit đầy đủ nếu cần generate_release_notes dựa trên nhiều commit
       # with:
-      #   fetch-depth: 0
+      #   fetch-depth: 0 # Bỏ comment nếu cần
 
     # Bước 2: Cài đặt môi trường Python
     - name: Set up Python
@@ -34,7 +34,7 @@ jobs:
         # Chọn phiên bản Python. Đặt một phiên bản cụ thể (như 3.12) tốt hơn '3.x' trong CI.
         python-version: '3.12' # Bạn có thể thay đổi phiên bản này nếu cần
         # Tùy chọn: Bật caching cho pip để tăng tốc độ cài đặt thư viện
-        cache: pip
+        cache: pip # Bỏ comment nếu muốn dùng cache
 
     # Bước 3: Cài đặt các thư viện phụ thuộc
     # Đảm bảo 'pyinstaller' có trong file requirements.txt của bạn
@@ -53,17 +53,10 @@ jobs:
     - name: Run PyInstaller command
       shell: pwsh
       run: pyinstaller --clean --workpath "${{ github.workspace }}/build" --distpath "${{ github.workspace }}/dist" --name "Easy AI Subbing" --icon "app_icon.ico" --windowed --onedir --add-data "app_icon.ico;." "main.py"
-      # Giải thích các tùy chọn:
-      # --clean: Xóa các thư mục build/dist/spec tạm thời trước khi build. Giúp tránh lỗi do file cũ.
-      # --workpath "${{ github.workspace }}/build": Chỉ định rõ ràng thư mục làm việc tạm thời trong thư mục gốc của repo.
-      # --distpath "${{ github.workspace }}/dist": Chỉ định rõ ràng thư mục output cuối cùng trong thư mục gốc của repo.
-      # --name "Easy AI Subbing": Tên của thư mục output (trong dist/) và tên file thực thi chính bên trong (Easy AI Subbing.exe). Dùng dấu ngoặc kép vì có khoảng trắng.
-      # --icon "app_icon.ico": File icon cho ứng dụng. Đảm bảo đường dẫn tương đối đúng từ thư mục gốc repo. Dùng dấu ngoặc kép.
-      # --windowed: Ứng dụng GUI (không mở cửa sổ console). Nếu là ứng dụng dòng lệnh (CLI), HÃY BỎ "--windowed".
-      # --onedir: Build thành một thư mục chứa file .exe và các file phụ thuộc.
-      # --add-data "app_icon.ico;.": Thêm file icon vào thư mục gốc của gói onedir. Đảm bảo đường dẫn tương đối đúng. Dùng dấu ngoặc kép.
-      # "main.py": File script Python chính. Đảm bảo đường dẫn tương đối đúng từ thư mục gốc repo. Dùng dấu ngoặc kép.
-      # Lưu ý: Sử dụng "${{ github.workspace }}/..." đảm bảo đường dẫn tuyệt đối chính xác trên runner.
+      # Giải thích các tùy chọn (xem comment chi tiết ở file YAML trước)
+      # --clean, --workpath, --distpath, --name, --icon, --windowed, --onedir, --add-data, main.py
+      # ĐẢM BẢO tên file icon và script chính CÓ dấu ngoặc kép " " nếu chứa khoảng trắng
+      # ĐẢM BẢO --windowed được giữ lại nếu là GUI, hoặc bị xóa nếu là CLI
 
     # Bước 5: Đổi tên thư mục output đã build để dễ nhận dạng (tùy chọn nhưng tốt)
     # PyInstaller đặt output trong thư mục 'dist'. Tên thư mục là "Easy AI Subbing".
@@ -115,6 +108,11 @@ jobs:
     # Job này không cần chạy trên Windows, chạy trên Ubuntu là đủ và thường nhanh hơn
     runs-on: ubuntu-latest
 
+    # THÊM KHỐI permissions NÀY VÀO ĐÂY
+    permissions:
+      contents: write # Cấp quyền ghi cho nội dung repo (cần để tạo release và upload assets)
+    # KẾT THÚC KHỐI permissions
+
     # Các bước (steps) thực hiện trong job release
     steps:
     # Bước 1: Tải về artifact (file .zip) đã được upload từ job build_windows
@@ -124,7 +122,7 @@ jobs:
         # Tên của artifact cần tải về (phải khớp với tên ở job build_windows)
         name: windows-build-zip
         # Đường dẫn thư mục sẽ chứa artifact sau khi tải về.
-        # Khi artifact là một file đơn (file .zip), nó sẽ được tải về vào thư mục con
+        # Khi artifact là một file đơn (file .zip), v4 sẽ tải nó vào thư mục con
         # có tên giống artifact bên trong thư mục 'path' được chỉ định.
         # Ví dụ: artifacts/windows-build-zip/Easy AI Subbing-v1.0.0-windows.zip
         path: artifacts
@@ -135,7 +133,7 @@ jobs:
         # Liệt kê nội dung thư mục artifact đã tải về
         ls -R artifacts/ # Sử dụng ls -R để xem cấu trúc thư mục
 
-    # Bước 3: Tạo GitHub Release và đính kèm file .zip
+    # Bước 3: Tạo GitHub Release và Đính kèm file .zip
     - name: Create GitHub Release and Upload Asset
       # Sử dụng action có sẵn để tạo release
       uses: softprops/action-gh-release@v1
@@ -148,7 +146,9 @@ jobs:
         generate_release_notes: true
         # Chỉ định file .zip cần đính kèm vào release.
         # Đường dẫn đến file .zip sau khi đã tải artifact về (xem giải thích ở Bước 1 Download).
-        files: artifacts/windows-build-zip/Easy AI Subbing-${{ github.ref_name }}-windows.zip
+        # Sử dụng pattern wildcard để tìm file zip bên trong thư mục artifact đã tải về
+        files: artifacts/windows-build-zip/*.zip # <-- ĐÃ SỬA DỤNG WILDCARD
       env:
         # Token mặc định mà GitHub Actions cung cấp để cho phép tương tác với API của GitHub
+        # Quyền của token này được cấu hình trong khối 'permissions' của job
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
