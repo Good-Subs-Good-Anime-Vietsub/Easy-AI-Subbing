@@ -57,7 +57,7 @@ jobs:
         # --add-data "app_icon.ico;." -> Thêm file icon vào thư mục dữ liệu (có thể dư với --icon nhưng theo yêu cầu)
         # main.py                  -> File script chính
         # THAY THẾ 'app_icon.ico' và 'main.py' bằng đường dẫn TƯƠNG ĐỐI đến file của bạn nếu chúng không ở thư mục gốc
-        pyinstaller --name "Easy AI Subbing" --icon app_icon.ico --windowed --onedir --add-data "app_icon.ico;." main.py
+        pyinstaller --clean --name "Easy AI Subbing" --icon app_icon.ico --windowed --onedir --add-data "app_icon.ico;." main.py
 
     # Bước 5: Đổi tên thư mục output đã build để dễ nhận dạng (tùy chọn nhưng tốt)
     # PyInstaller đặt output trong thư mục 'dist'. Tên thư mục là "Easy AI Subbing".
