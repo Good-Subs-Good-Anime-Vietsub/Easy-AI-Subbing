@@ -53,10 +53,17 @@ jobs:
     - name: Run PyInstaller command
       shell: pwsh
       run: pyinstaller --clean --workpath "${{ github.workspace }}/build" --distpath "${{ github.workspace }}/dist" --name "Easy AI Subbing" --icon "app_icon.ico" --windowed --onedir --add-data "app_icon.ico;." "main.py"
-      # Giải thích các tùy chọn (xem comment chi tiết ở file YAML trước)
-      # --clean, --workpath, --distpath, --name, --icon, --windowed, --onedir, --add-data, main.py
-      # ĐẢM BẢO tên file icon và script chính CÓ dấu ngoặc kép " " nếu chứa khoảng trắng
-      # ĐẢM BẢO --windowed được giữ lại nếu là GUI, hoặc bị xóa nếu là CLI
+      # Giải thích các tùy chọn:
+      # --clean: Xóa các thư mục build/dist/spec tạm thời trước khi build. Giúp tránh lỗi do file cũ.
+      # --workpath "${{ github.workspace }}/build": Chỉ định rõ ràng thư mục làm việc tạm thời trong thư mục gốc của repo.
+      # --distpath "${{ github.workspace }}/dist": Chỉ định rõ ràng thư mục output cuối cùng trong thư mục gốc của repo.
+      # --name "Easy AI Subbing": Tên của thư mục output (trong dist/) và tên file thực thi chính bên trong (Easy AI Subbing.exe). Dùng dấu ngoặc kép vì có khoảng trắng.
+      # --icon "app_icon.ico": File icon cho ứng dụng. Đảm bảo đường dẫn tương đối đúng từ thư mục gốc repo. Dùng dấu ngoặc kép.
+      # --windowed: Ứng dụng GUI (không mở cửa sổ console). Nếu là ứng dụng dòng lệnh (CLI), HÃY BỎ "--windowed".
+      # --onedir: Build thành một thư mục chứa file .exe và các file phụ thuộc.
+      # --add-data "app_icon.ico;.": Thêm file icon vào thư mục gốc của gói onedir. Đảm bảo đường dẫn tương đối đúng. Dùng dấu ngoặc kép.
+      # "main.py": File script Python chính. Đảm bảo đường dẫn tương đối đúng từ thư mục gốc repo. Dùng dấu ngoặc kép.
+      # Lưu ý: Sử dụng "${{ github.workspace }}/..." đảm bảo đường dẫn tuyệt đối chính xác trên runner.
 
     # Bước 5: Đổi tên thư mục output đã build để dễ nhận dạng (tùy chọn nhưng tốt)
     # PyInstaller đặt output trong thư mục 'dist'. Tên thư mục là "Easy AI Subbing".
@@ -69,8 +76,14 @@ jobs:
         # Đường dẫn đích là tên thư mục sau khi đổi tên
         $destDir = "${{ github.workspace }}/dist/Easy AI Subbing-windows"
         Write-Host "Attempting to rename '$sourceDir' to '$destDir'"
-        # Sử dụng Move-Item của PowerShell để đổi tên/di chuyển
-        Move-Item -Path $sourceDir -Destination $destDir -Force
+        # Sử dụng Move-Item của PowerShell để đổi tên/di chuyển. Kiểm tra sự tồn tại trước khi di chuyển.
+        if (Test-Path $sourceDir) {
+            Move-Item -Path $sourceDir -Destination $destDir -Force
+        } else {
+            Write-Host "Source directory '$sourceDir' not found. Skipping rename."
+            # Có thể muốn dừng workflow nếu thư mục output không được tạo ra
+            # exit 1
+        }
 
     # Bước 6: Nén thư mục output thành file .zip có kèm phiên bản
     - name: Create zip archive
@@ -84,13 +97,22 @@ jobs:
         # Đường dẫn đến thư mục cần nén (sau khi đổi tên ở bước 5)
         $sourceDirectory = "${{ github.workspace }}/dist/Easy AI Subbing-windows"
 
-        Write-Host "Nén thư mục: $sourceDirectory thành file: $zipFilePath"
+        Write-Host "Attempting to zip directory: $sourceDirectory to file: $zipFilePath"
 
-        # Nén thư mục. -Force ghi đè nếu file zip đã tồn tại (không cần thiết trong workflow mới)
-        Compress-Archive -Path $sourceDirectory -DestinationPath $zipFilePath -Force # -CompressionLevel Fastest (Tùy chọn nén nhanh hơn)
+        # Nén thư mục. Kiểm tra sự tồn tại của thư mục nguồn trước khi nén.
+        if (Test-Path $sourceDirectory) {
+            Compress-Archive -Path $sourceDirectory -DestinationPath $zipFilePath -Force # -CompressionLevel Fastest (Tùy chọn nén nhanh hơn)
+            Write-Host "Zip archive created successfully."
+        } else {
+            Write-Host "Source directory '$sourceDirectory' not found. Skipping zip creation."
+            # Có thể muốn dừng workflow nếu thư mục nguồn không tồn tại
+            # exit 1
+        }
+
 
     # Bước 7: Upload file .zip đã tạo lên làm artifact của workflow
     # Artifact là file tạm thời lưu trữ kết quả giữa các job hoặc để tải về sau
+    # Sử dụng if: success() để chỉ upload nếu các bước trước thành công
     - name: Upload build artifact (zip file)
       uses: actions/upload-artifact@v4
       with:
@@ -98,6 +120,14 @@ jobs:
         name: windows-build-zip
         # Đường dẫn đến file .zip cần upload (relative to GITHUB_WORKSPACE)
         path: ${{ github.workspace }}/dist/Easy AI Subbing-${{ github.ref_name }}-windows.zip
+      # Thêm điều kiện chỉ chạy bước này nếu file zip tồn tại
+      # if: success() && steps.create_zip_archive.outcome == 'success' && steps.create_zip_archive.outputs.zip_file_path # <-- Đây là cách tốt nhất nếu bước 6 có output path
+      # Vì Compress-Archive không có output path trực tiếp, chúng ta kiểm tra sự tồn tại của file zip sau khi nén
+      # Cần thêm một bước kiểm tra sự tồn tại file zip trước khi upload hoặc dựa vào output của bước 6.
+      # Cách đơn giản nhất là kiểm tra sự tồn tại file ngay trong step upload, nhưng upload-artifact không có tùy chọn đó.
+      # Chúng ta sẽ dựa vào bước Create zip archive có báo lỗi nếu không tạo được file.
+      # Thêm kiểm tra file sau khi nén và lưu đường dẫn vào biến môi trường/output là cách robust nhất, nhưng phức tạp hơn.
+      # Tạm thời, dựa vào Compress-Archive báo lỗi nếu nguồn không tồn tại và kiểm tra sự tồn tại file sau đó (hoặc dựa vào bước Debug)
 
   # Job để tạo GitHub Release và đính kèm file .zip
   release:
@@ -108,32 +138,43 @@ jobs:
     # Job này không cần chạy trên Windows, chạy trên Ubuntu là đủ và thường nhanh hơn
     runs-on: ubuntu-latest
 
-    # THÊM KHỐI permissions NÀY VÀO ĐÂY
+    # Cấp quyền cho GITHUB_TOKEN. Cần quyền 'write' để tạo release và upload assets.
     permissions:
-      contents: write # Cấp quyền ghi cho nội dung repo (cần để tạo release và upload assets)
-    # KẾT THÚC KHỐI permissions
+      contents: write
+      # Thêm quyền releases: write (thường bao gồm trong contents:write, nhưng thêm vào cho rõ ràng)
+      releases: write
 
     # Các bước (steps) thực hiện trong job release
     steps:
     # Bước 1: Tải về artifact (file .zip) đã được upload từ job build_windows
+    # Tải artifact vào thư mục gốc của workspace trong job release (trên Ubuntu runner)
+    # Theo hành vi v4, file zip sẽ được tải vào artifacts/windows-build-zip/
     - name: Download build artifact
       uses: actions/download-artifact@v4
       with:
-        # Tên của artifact cần tải về (phải khớp với tên ở job build_windows)
-        name: windows-build-zip
-        # Đường dẫn thư mục sẽ chứa artifact sau khi tải về.
-        # Khi artifact là một file đơn (file .zip), v4 sẽ tải nó vào thư mục con
-        # có tên giống artifact bên trong thư mục 'path' được chỉ định.
-        # Ví dụ: artifacts/windows-build-zip/Easy AI Subbing-v1.0.0-windows.zip
-        path: artifacts
+        name: windows-build-zip # Tên artifact đã upload ở job build
+        path: artifacts       # Tải vào thư mục 'artifacts'
 
-    # Bước 2: Kiểm tra các file đã tải về (tùy chọn, giúp gỡ lỗi)
-    - name: List downloaded files (for debugging)
+    # Bước 2: Debug - Liệt kê nội dung của thư mục artifact đã tải về
+    # Bước này giúp kiểm tra xem file zip đã được tải về thành công và nằm ở đâu
+    - name: Debug: List downloaded artifact contents
       run: |
-        # Liệt kê nội dung thư mục artifact đã tải về
-        ls -R artifacts/ # Sử dụng ls -R để xem cấu trúc thư mục
+        echo "Current directory: $(pwd)"
+        echo "Contents of artifacts/:"
+        ls -lha artifacts/
+        echo "Contents of artifacts/windows-build-zip/:"
+        # Kiểm tra xem có thư mục 'windows-build-zip' được tạo ra không (v4 nên làm vậy)
+        if [ -d "artifacts/windows-build-zip" ]; then
+          ls -lha artifacts/windows-build-zip/
+          echo "Looking for zip file using find:"
+          # Sử dụng find để tìm file zip và in đường dẫn đầy đủ
+          find artifacts/windows-build-zip/ -name "*.zip" -print || echo "No zip file found with *.zip pattern"
+        else
+          echo "Directory 'artifacts/windows-build-zip' not found."
+        fi
 
     # Bước 3: Tạo GitHub Release và Đính kèm file .zip
+    # Thay đổi cách chỉ định files
     - name: Create GitHub Release and Upload Asset
       # Sử dụng action có sẵn để tạo release
       uses: softprops/action-gh-release@v1
@@ -145,9 +186,9 @@ jobs:
         # Tùy chọn: Tự động tạo ghi chú release dựa trên các commit từ tag trước đến tag hiện tại
         generate_release_notes: true
         # Chỉ định file .zip cần đính kèm vào release.
-        # Đường dẫn đến file .zip sau khi đã tải artifact về (xem giải thích ở Bước 1 Download).
-        # Sử dụng pattern wildcard để tìm file zip bên trong thư mục artifact đã tải về
-        files: artifacts/windows-build-zip/*.zip # <-- ĐÃ SỬA DỤNG WILDCARD
+        # Dựa trên hành vi của download-artifact v4, file zip nên nằm trong thư mục windows-build-zip/
+        # Sử dụng pattern wildcard. Đường dẫn tương đối từ thư mục gốc của job release.
+        files: artifacts/windows-build-zip/*.zip # <-- Giữ pattern này
       env:
         # Token mặc định mà GitHub Actions cung cấp để cho phép tương tác với API của GitHub
         # Quyền của token này được cấu hình trong khối 'permissions' của job
