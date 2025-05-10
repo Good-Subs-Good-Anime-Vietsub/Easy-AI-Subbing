@@ -1,0 +1,146 @@
+# Tên của workflow, hiển thị trong tab "Actions" trên GitHub
+name: Build and Release for Windows
+
+# Kích hoạt workflow khi có một sự kiện cụ thể
+on:
+  # Chạy workflow khi có commit được push và commit đó có gắn một tag
+  # Tag này phải khớp với pattern 'v*' (ví dụ: v1.0.0, v2.5, v1.0.0-beta)
+  push:
+    tags:
+      - 'v*'
+
+# Các job sẽ được chạy trong workflow này
+jobs:
+  # Job để build ứng dụng trên Windows
+  build_windows:
+    # Tên hiển thị của job
+    name: Build on Windows
+    # Môi trường chạy job này - runner của GitHub Actions trên Windows mới nhất
+    runs-on: windows-latest
+
+    # Các bước (steps) thực hiện trong job build_windows
+    steps:
+    # Bước 1: Lấy mã nguồn từ repository
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    # Bước 2: Cài đặt môi trường Python
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        # Chọn phiên bản Python. '3.x' sẽ lấy phiên bản mới nhất của Python 3.
+        python-version: '3.12'
+        # Tùy chọn: Bật caching cho pip để tăng tốc độ cài đặt thư viện
+        # cache: pip # Bỏ comment nếu muốn dùng cache
+
+    # Bước 3: Cài đặt các thư viện phụ thuộc
+    # Đảm bảo 'pyinstaller' có trong file requirements.txt của bạn
+    - name: Install dependencies
+      run: |
+        # Nâng cấp pip lên phiên bản mới nhất
+        python -m pip install --upgrade pip
+        # Cài đặt tất cả thư viện được liệt kê trong requirements.txt
+        # Workflow này dựa vào việc PyInstaller CÓ trong requirements.txt
+        pip install -r requirements.txt
+
+    # Bước 4: Chạy PyInstaller với lệnh được chỉ định
+    # Lệnh này sẽ tạo ra thư mục output trong thư mục 'dist'
+    - name: Run PyInstaller command
+      # Sử dụng command prompt shell trên Windows để đảm bảo các lệnh chạy đúng cú pháp
+      shell: cmd
+      run: |
+        # Lệnh PyInstaller theo yêu cầu của bạn:
+        # --name "Easy AI Subbing" -> Tên thư mục output trong dist/
+        # --icon app_icon.ico      -> File icon
+        # --windowed               -> Ứng dụng GUI, không console. NẾU LÀ CLI, HÃY BỎ --windowed
+        # --onedir                 -> Build thành thư mục
+        # --add-data "app_icon.ico;." -> Thêm file icon vào thư mục dữ liệu (có thể dư với --icon nhưng theo yêu cầu)
+        # main.py                  -> File script chính
+        # THAY THẾ 'app_icon.ico' và 'main.py' bằng đường dẫn TƯƠNG ĐỐI đến file của bạn nếu chúng không ở thư mục gốc
+        pyinstaller --name "Easy AI Subbing" --icon app_icon.ico --windowed --onedir --add-data "app_icon.ico;." main.py
+
+    # Bước 5: Đổi tên thư mục output đã build để dễ nhận dạng (tùy chọn nhưng tốt)
+    # PyInstaller đặt output trong thư mục 'dist'. Tên thư mục là "Easy AI Subbing".
+    - name: Rename output directory for clarity
+      shell: cmd
+      run: |
+        # Di chuyển/đổi tên thư mục "dist\Easy AI Subbing" thành "dist\Easy AI Subbing-windows"
+        # Dùng dấu ngoặc kép vì tên thư mục có khoảng trắng
+        move "dist\Easy AI Subbing" "dist\Easy AI Subbing-windows"
+
+    # Bước 6: Nén thư mục output thành file .zip có kèm phiên bản
+    - name: Create zip archive
+      # Sử dụng PowerShell để dùng lệnh Compress-Archive
+      shell: pwsh
+      run: |
+        # Tên file zip sẽ là "Easy AI Subbing-<phiên bản>-windows.zip"
+        # ${{ github.ref_name }} là tên tag (ví dụ: v1.0.0)
+        $zipFileName = "Easy AI Subbing-${{ github.ref_name }}-windows.zip"
+        # Đường dẫn đầy đủ đến file zip sẽ nằm trong thư mục dist/
+        $zipFilePath = "dist\$zipFileName"
+        # Đường dẫn đến thư mục cần nén (sau khi đổi tên ở bước 5)
+        $sourceDirectory = "dist\Easy AI Subbing-windows"
+
+        Write-Host "Nén thư mục: $sourceDirectory thành file: $zipFilePath"
+
+        # Nén thư mục. -Force ghi đè nếu file zip đã tồn tại (không cần thiết trong workflow mới)
+        # -CompressionLevel Fastest để nén nhanh hơn (tùy chọn)
+        Compress-Archive -Path $sourceDirectory -DestinationPath $zipFilePath -Force #-CompressionLevel Fastest
+
+    # Bước 7: Upload file .zip đã tạo lên làm artifact của workflow
+    # Artifact là file tạm thời lưu trữ kết quả giữa các job hoặc để tải về sau
+    - name: Upload build artifact (zip file)
+      uses: actions/upload-artifact@v4
+      with:
+        # Tên của artifact (để job release tải về)
+        name: windows-build-zip
+        # Đường dẫn đến file .zip cần upload (được tạo ở bước 6)
+        # Sử dụng cùng logic tạo tên file zip
+        path: dist/Easy AI Subbing-${{ github.ref_name }}-windows.zip
+
+  # Job để tạo GitHub Release và đính kèm file .zip
+  release:
+    # Tên hiển thị của job
+    name: Create Release
+    # Job này PHẢI chờ job 'build_windows' hoàn thành thành công
+    needs: build_windows
+    # Job này không cần chạy trên Windows, chạy trên Ubuntu là đủ và thường nhanh hơn
+    runs-on: ubuntu-latest
+
+    # Các bước (steps) thực hiện trong job release
+    steps:
+    # Bước 1: Tải về artifact (file .zip) đã được upload từ job build_windows
+    - name: Download build artifact
+      uses: actions/download-artifact@v4
+      with:
+        # Tên của artifact cần tải về (phải khớp với tên ở job build_windows)
+        name: windows-build-zip
+        # Đường dẫn thư mục sẽ chứa artifact sau khi tải về.
+        # Khi artifact là một file đơn (file .zip), nó sẽ được tải về trực tiếp vào thư mục này.
+        # Ví dụ: artifacts/Easy AI Subbing-v1.0.0-windows.zip
+        path: artifacts
+
+    # Bước 2: Kiểm tra các file đã tải về (tùy chọn, giúp gỡ lỗi)
+    - name: List downloaded files (for debugging)
+      run: |
+        # Liệt kê nội dung thư mục artifact đã tải về
+        ls artifacts/
+
+    # Bước 3: Tạo GitHub Release và đính kèm file .zip
+    - name: Create GitHub Release and Upload Asset
+      # Sử dụng action có sẵn để tạo release
+      uses: softprops/action-gh-release@v1
+      with:
+        # Tên tag được sử dụng làm tên release (ví dụ: v1.0.0)
+        tag_name: ${{ github.ref_name }}
+        # Tiêu đề của release (ví dụ: Release v1.0.0)
+        name: Release ${{ github.ref_name }}
+        # Tùy chọn: Tự động tạo ghi chú release dựa trên các commit
+        generate_release_notes: true
+        # Chỉ định file .zip cần đính kèm vào release.
+        # Đường dẫn đến file .zip sau khi đã tải artifact về.
+        # Sử dụng cùng logic tạo tên file zip
+        files: artifacts/Easy AI Subbing-${{ github.ref_name }}-windows.zip
+      env:
+        # Token mặc định mà GitHub Actions cung cấp để cho phép tương tác với API của GitHub
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
