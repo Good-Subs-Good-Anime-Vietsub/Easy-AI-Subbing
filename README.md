@@ -26,9 +26,10 @@ Before you can run this application, you need to have the following installed:
 
 ## Running the Application
 
-1.  **Activate your virtual environment** (if you created one):
+1.  **Activate your virtual environment** 
     ```bash
     # On Windows
+    python -m venv venv
     .\venv\Scripts\activate
 
     # On macOS and Linux
@@ -36,30 +37,17 @@ Before you can run this application, you need to have the following installed:
     ```
 
 2.  **Run the main script:**
+
+    ```bash
+    pip install -r requirements.txt
+    ```
+
     ```bash
     python main.py
     ```
 
+
 3.  When the application opens, paste your Gemini API key into the "Gemini API Key" field and click "Save Key". The key will be securely stored in `~/.gemini_srt_key` on your system.
-
-## Building the Executable (Windows)
-
-If you want a standalone application bundle (requiring users to only have FFmpeg), you can use PyInstaller.
-
-1.  **Ensure you have PyInstaller installed** (it's included in `requirements.txt`):
-    ```bash
-    pip install pyinstaller
-    ```
-
-2.  **Run the PyInstaller command** (using `--onedir` for a smaller main executable):
-    ```bash
-    pyinstaller --name "Easy AI Subbing" --icon app_icon.ico --windowed --onedir --add-data "app_icon.ico;." main.py
-    ```
-    *   Make sure `app_icon.ico` is in the same directory as `main.py`.
-
-3.  The executable bundle will be created in the `dist` folder, specifically `dist\Easy AI Subbing`.
-
-4.  To distribute, zip the `dist\Easy AI Subbing` folder and share it. Users will need to extract it and run `Easy AI Subbing.exe` from within that folder. Remember, **users still need FFmpeg installed and in their PATH.**
 
 ## Usage
 
@@ -79,14 +67,6 @@ If you want a standalone application bundle (requiring users to only have FFmpeg
 *   **Default Model:** Can be changed in the GUI.
 *   **Default Prompts:** Can be edited directly in the GUI text areas.
 
-## Troubleshooting
-
-*   **FFmpeg Not Found:** Ensure FFmpeg is installed and its `bin` directory is added to your system's PATH. Restart your terminal/IDE after adding to PATH.
-*   **API Errors (401, 429, Model Not Found):** Double-check your API key, ensure it's correct and hasn't expired, check your usage quota on Google AI Studio, and verify the model name is correct and available to you.
-*   **"Failed to load Python DLL" error after building:** Ensure you have the correct Microsoft Visual C++ Redistributable installed (usually 2015-2022 version for recent Python). Try running `pyinstaller --clean main.py` and rebuilding. Temporarily disable antivirus if it might be interfering. Make sure you run the `.exe` from inside the `dist\Easy AI Subbing` folder.
-*   **No output or strange output:** Check your prompts for syntax errors or missing placeholders. Ensure the selected file is valid for the chosen task.
-*   **Icon not displaying:** Ensure `app_icon.ico` was included in the PyInstaller build using `--add-data` and that the path in `main.py` is correct relative to the bundle structure.
-
 ## Credits
 
 *   Developed by: GioChieu@KiOZ
@@ -99,10 +79,6 @@ If you want a standalone application bundle (requiring users to only have FFmpeg
     *   PyDub ([https://github.com/jiaaro/pydub](https://github.com/jiaaro/pydub))
     *   python-dotenv ([https://github.com/theskumar/python-dotenv](https://github.com/theskumar/python-dotenv))
     *   PyInstaller ([https://pyinstaller.org/](https://pyinstaller.org/))
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## Contributing
 
