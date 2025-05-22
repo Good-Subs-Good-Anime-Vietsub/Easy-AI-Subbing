@@ -1,4 +1,10 @@
 /build
 /dist
 /venv
+/clean_env
+/app_logs
 *.spec
+/__pycache__
+/app_gui/__pycache__
+app_settings.ini
+/core/__pycache__
